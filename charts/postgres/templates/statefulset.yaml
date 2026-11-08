@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  serviceName: postgres
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql
+        readinessProbe:
+          exec:
+            command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+        livenessProbe:
+          tcpSocket:
+            port: postgres-port     # only asks "is the port open?"
+          initialDelaySeconds: 30   # wait before the first check
+          periodSeconds: 10         # check every 10 s
+          failureThreshold: 6       # restart only after ~1 minute of failures
+        env:
+          - name: POSTGRES_USER
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.credentialsSecret }}
+                key: username
+          - name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.credentialsSecret }}
+                key: password
+          - name: POSTGRES_DB
+            value: {{ .Values.db.name }}
+        ports:
+          - name: postgres-port
+            containerPort: 5432
+  volumeClaimTemplates:
+  - metadata:
+      name: data # must match the volumeMounts
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: {{ .Values.storage.size }}

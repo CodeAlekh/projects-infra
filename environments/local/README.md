@@ -82,7 +82,55 @@ docker exec local-projects-kind-cluster-worker crictl images | grep projects-ser
 
 After a code change: rebuild with a new tag (e.g. `0.0.2`), load it again, and update the tag in the values file.
 
-## 5. projects-service (manual for now, Argo CD later)
+## 5. Database credentials Secret (manual, never in git)
+
+One Secret with the Postgres username/password. Secrets are namespace-scoped, so it is
+needed in BOTH namespaces: `postgres` (the server creates the user from it) and
+`projects-service` (the app logs in with it). Same values in both. Vault replaces this later.
+
+```bash
+kubectl create namespace postgres
+kubectl create namespace projects-service
+for ns in postgres projects-service; do
+  kubectl create secret generic postgres-credentials -n $ns \
+    --from-literal=username=projects \
+    --from-literal=password='<choose-one>'
+done
+
+# check (keys only; values are just base64, not encrypted)
+kubectl describe secret postgres-credentials -n postgres
+```
+
+## 6. Postgres (hand-written StatefulSet, kind only)
+
+Chart `charts/postgres` (Postgres 18): headless Service `postgres` (port 5432) +
+StatefulSet `postgres` (1 replica, PVC `data-postgres-0` from `volumeClaimTemplates`,
+mounted at `/var/lib/postgresql`). Chart defaults are the kind settings, so no local
+values file. Prod uses CloudNativePG instead of this chart.
+
+```bash
+# validate against the API server (nothing is saved)
+helm template postgres charts/postgres -n postgres \
+  | kubectl apply -n postgres --dry-run=server -f -
+
+helm install postgres charts/postgres -n postgres
+kubectl get pods,pvc -n postgres -w   # postgres-0 1/1 Running, PVC Bound
+```
+
+Check you can log in (uses the env vars from the Secret inside the pod):
+
+```bash
+kubectl exec -n postgres postgres-0 -- sh -c \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select current_user, current_database();"'
+```
+
+DNS name for clients: `postgres-0.postgres.postgres.svc.cluster.local:5432`
+(pod `postgres-0`, Service `postgres`, namespace `postgres`).
+
+Note: the PVC lives on the laptop's disk (kind's local-path provisioner); the `1Gi`
+size is not enforced. `kind delete cluster` deletes the data.
+
+## 7. projects-service (manual for now, Argo CD later)
 
 Work in progress: crashes until Postgres exists (step 3 of the plan).
 

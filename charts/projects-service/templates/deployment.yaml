@@ -11,6 +11,8 @@ spec:
     metadata:
       labels:
         app: projects-service
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
       containers:
         - name: projects-service
@@ -18,6 +20,20 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.containerPort }}
+          envFrom:
+            - configMapRef:
+                name: projects-service-config
+          env:
+            - name: POSTGRES_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.db.credentialsSecret }}
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.db.credentialsSecret }}
+                  key: password
           livenessProbe:
             httpGet:
               path: /livez

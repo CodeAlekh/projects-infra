@@ -1,0 +1,8 @@
+image:
+  repository: postgres
+  tag: "18"
+db:
+  name: projects
+storage:
+  size: 1Gi
+credentialsSecret: postgres-credentials

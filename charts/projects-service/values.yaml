@@ -3,3 +3,8 @@ image:
   tag: "0.0.1"
 containerPort: 8080
 replicaCount: 2
+db:
+  host: ""
+  port: 5432
+  dbName: projects
+  credentialsSecret: postgres-credentials

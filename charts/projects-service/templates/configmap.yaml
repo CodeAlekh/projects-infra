@@ -1,0 +1,7 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: projects-service-config
+data:
+  APP_POSTGRES_URL: "jdbc:postgresql://{{ required "db.host must be set" .Values.db.host }}:{{ .Values.db.port }}/{{ .Values.db.dbName }}"
+  
