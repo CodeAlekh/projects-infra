@@ -132,10 +132,18 @@ size is not enforced. `kind delete cluster` deletes the data.
 
 ## 7. projects-service (manual for now, Argo CD later)
 
-Work in progress: crashes until Postgres exists (step 3 of the plan).
+Needs steps 4–6 first (image loaded, Secret in the `projects-service` namespace,
+Postgres running).
 
 Chart defaults are in `charts/projects-service/values.yaml`; kind overrides
-(1 replica, local image tag) are in `projects-service-values.yaml`.
+(1 replica, local image tag, `db.host`) are in `projects-service-values.yaml`.
+
+How the app gets its DB settings:
+- ConfigMap `projects-service-config` (rendered from `db.*` values) → `envFrom` →
+  `APP_POSTGRES_URL=jdbc:postgresql://postgres.postgres.svc.cluster.local:5432/projects`.
+  `db.host` is `required`: rendering fails if an environment doesn't set it.
+- Secret `postgres-credentials` → `env` + `secretKeyRef` → `POSTGRES_USERNAME` / `POSTGRES_PASSWORD`.
+- The pod template has a `checksum/config` annotation, so a ConfigMap change rolls out new pods.
 Always pass `-n projects-service`: the release lives in that namespace, and without
 `-n` Helm looks in `default` ("has no deployed releases").
 
@@ -158,8 +166,16 @@ helm install projects-service charts/projects-service \
 helm upgrade projects-service charts/projects-service -n projects-service \
   -f environments/local/projects-service-values.yaml
 
-kubectl get pods -n projects-service -w
+kubectl get pods -n projects-service -w             # 1/1 Running
 helm history projects-service -n projects-service   # one revision per install/upgrade
+```
+
+Check it end to end from inside the cluster (throwaway curl pod):
+
+```bash
+kubectl run curl-test -n projects-service --rm -i --restart=Never \
+  --image=curlimages/curl:8.11.1 -- curl -s http://projects-service/readyz
+# {"status":"UP","components":{"db":{"status":"UP"},"readinessState":{"status":"UP"}}}
 ```
 
 Debugging:

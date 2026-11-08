@@ -10,3 +10,8 @@ ports:
     nodePort: 30080
   websecure:
     nodePort: 30443
+gateway:
+  listeners:
+    web:
+      namespacePolicy:
+        from: All

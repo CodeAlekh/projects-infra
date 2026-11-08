@@ -36,15 +36,15 @@ spec:
                   key: password
           livenessProbe:
             httpGet:
-              path: /livez
+              path: /projects/livez
               port: http
           readinessProbe:
             httpGet:
-              path: /readyz
+              path: /projects/readyz
               port: http
           startupProbe:
             httpGet:
-              path: /livez
+              path: /projects/livez
               port: http
             periodSeconds: 12
             failureThreshold: 10

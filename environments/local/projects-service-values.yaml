@@ -1,6 +1,5 @@
 image:
-  tag: "0.0.1"
+  tag: "0.0.2"
 replicaCount: 1
 db:
   host: "postgres.postgres.svc.cluster.local"
-  
