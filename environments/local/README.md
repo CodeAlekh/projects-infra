@@ -34,8 +34,11 @@ kubectl get crds | grep gateway.networking.k8s.io
 ## 3. Traefik (Gateway API controller)
 
 Chart `traefik/traefik` 42.3.1 (Traefik v3.7.17). Settings in `traefik-values.yaml`:
-Gateway API provider on, Service type NodePort, nodePorts 30080 / 30443.
-The chart also creates a default `GatewayClass` and `Gateway` in the `traefik` namespace.
+Gateway API provider on, Service type NodePort, nodePorts 30080 / 30443, and the
+Gateway's `web` listener accepts HTTPRoutes from **all** namespaces
+(`gateway.listeners.web.namespacePolicy.from: All`; the default `Same` would ignore
+routes in app namespaces). The chart also creates a default `GatewayClass` and
+`Gateway` in the `traefik` namespace.
 
 ```bash
 helm repo add traefik https://traefik.github.io/charts
@@ -136,7 +139,11 @@ Needs steps 4–6 first (image loaded, Secret in the `projects-service` namespac
 Postgres running).
 
 Chart defaults are in `charts/projects-service/values.yaml`; kind overrides
-(1 replica, local image tag, `db.host`) are in `projects-service-values.yaml`.
+(1 replica, local image tag, `db.host`, route on `api.localhost`) are in
+`projects-service-values.yaml`.
+
+The app serves everything under its context path `/projects` (Spring
+`server.servlet.context-path`), so probes use `/projects/livez` and `/projects/readyz`.
 
 How the app gets its DB settings:
 - ConfigMap `projects-service-config` (rendered from `db.*` values) → `envFrom` →
@@ -144,6 +151,13 @@ How the app gets its DB settings:
   `db.host` is `required`: rendering fails if an environment doesn't set it.
 - Secret `postgres-credentials` → `env` + `secretKeyRef` → `POSTGRES_USERNAME` / `POSTGRES_PASSWORD`.
 - The pod template has a `checksum/config` annotation, so a ConfigMap change rolls out new pods.
+
+How it is reached from outside (path-based routing on one API host):
+- HTTPRoute `projects-service` (only if `routes.enabled`; fails to render if enabled with
+  empty `routes.hostnames`) attaches to Gateway `traefik-gateway` (ns `traefik`), listener
+  `web`: host `api.localhost`, `PathPrefix /projects` → Service `projects-service:80`.
+- `http://api.localhost/projects/...` → localhost:80 → kind :30080 → Traefik → route → pod.
+
 Always pass `-n projects-service`: the release lives in that namespace, and without
 `-n` Helm looks in `default` ("has no deployed releases").
 
@@ -174,8 +188,18 @@ Check it end to end from inside the cluster (throwaway curl pod):
 
 ```bash
 kubectl run curl-test -n projects-service --rm -i --restart=Never \
-  --image=curlimages/curl:8.11.1 -- curl -s http://projects-service/readyz
+  --image=curlimages/curl:8.11.1 -- curl -s http://projects-service/projects/readyz
 # {"status":"UP","components":{"db":{"status":"UP"},"readinessState":{"status":"UP"}}}
+```
+
+From the laptop, through Traefik and the HTTPRoute:
+
+```bash
+kubectl describe httproute projects-service -n projects-service | sed -n '/Status:/,$p'
+#   Accepted True, ResolvedRefs True  (False + NotAllowedByListeners = Gateway namespacePolicy)
+curl -i http://api.localhost/projects/readyz   # 200 {"status":"UP",...}
+curl -i http://api.localhost/nothing           # 404 "404 page not found"  = Traefik, no route
+curl -i http://api.localhost/projects/nope     # 404 JSON {"status":404,...} = Spring, route worked
 ```
 
 Debugging:

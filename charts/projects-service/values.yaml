@@ -8,3 +8,12 @@ db:
   port: 5432
   dbName: projects
   credentialsSecret: postgres-credentials
+
+routes:
+  enabled: false
+  hostnames: []
+  parentRefs:
+    - name: traefik-gateway
+      namespace: traefik
+      sectionName: web
+  path: /projects

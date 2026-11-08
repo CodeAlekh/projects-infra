@@ -1,0 +1,24 @@
+{{- if .Values.routes.enabled }}
+{{- if empty .Values.routes.hostnames }}
+{{- fail "routes.hostnames must not be empty when routes.enabled is true" }}
+{{- end }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: projects-service
+spec:
+  parentRefs: 
+    {{- toYaml .Values.routes.parentRefs | nindent 4 }}
+  hostnames: 
+    {{- toYaml .Values.routes.hostnames | nindent 4 }}
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: {{ required "Valid path is required" .Values.routes.path }}
+    backendRefs:
+    - name: projects-service
+      port: 80
+{{- end }}
+
+

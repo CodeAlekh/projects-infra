@@ -3,3 +3,7 @@ image:
 replicaCount: 1
 db:
   host: "postgres.postgres.svc.cluster.local"
+
+routes:
+  enabled: true
+  hostnames: ["api.localhost"]
