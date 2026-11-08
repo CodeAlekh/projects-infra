@@ -1,0 +1,31 @@
+# --- Secrets: never commit (see CLAUDE.md section 9) ---
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+kubeconfig
+*.kubeconfig
+# Vault init output (root token / unseal keys)
+vault-init*.json
+# Plain-text secrets; encrypted ones (*.enc.yaml via SOPS) are allowed
+*secret*.yaml
+!*secret*.enc.yaml
+# Helm chart templates may be named secret.yaml (they contain {{ }}, not values)
+!charts/**/templates/*secret*.yaml
+
+# --- Helm ---
+# Downloaded chart dependencies and packaged charts
+charts/*/charts/
+*.tgz
+
+# --- Rendered output from helm template ---
+rendered/
+*.rendered.yaml
+
+# --- OS / editor ---
+.DS_Store
+*.swp
+*~
+.idea/
