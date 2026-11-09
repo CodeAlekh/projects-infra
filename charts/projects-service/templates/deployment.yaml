@@ -1,28 +1,28 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: projects-service
+  name: {{ .Release.Name }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: projects-service
+      app: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: projects-service
+        app: {{ .Release.Name }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
       containers:
-        - name: projects-service
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        - name: {{ .Release.Name }}
+          image: "{{ required "image.repository is required" .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
           ports:
             - name: http
               containerPort: {{ .Values.containerPort }}
           envFrom:
             - configMapRef:
-                name: projects-service-config
+                name: {{ .Release.Name }}
           env:
             - name: POSTGRES_USERNAME
               valueFrom:

@@ -1,6 +1,5 @@
 image:
   repository: projects-service
-  tag: "0.0.2"
 containerPort: 8080
 replicaCount: 2
 db:

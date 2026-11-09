@@ -3,5 +3,5 @@ apiVersion: v2
 name: projects-service
 description: A Helm chart for Kubernetes for the projects-service app
 version: 0.1.0
-# Tag of the image is fine
-appVersion: "0.0.1"
+# Informational only. The deployed tag comes from environments/<env>
+appVersion: "0.0.2"

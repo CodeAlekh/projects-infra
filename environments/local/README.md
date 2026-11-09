@@ -146,7 +146,7 @@ The app serves everything under its context path `/projects` (Spring
 `server.servlet.context-path`), so probes use `/projects/livez` and `/projects/readyz`.
 
 How the app gets its DB settings:
-- ConfigMap `projects-service-config` (rendered from `db.*` values) → `envFrom` →
+- ConfigMap named after the Helm release, here `projects-service` (rendered from `db.*` values) → `envFrom` →
   `APP_POSTGRES_URL=jdbc:postgresql://postgres.postgres.svc.cluster.local:5432/projects`.
   `db.host` is `required`: rendering fails if an environment doesn't set it.
 - Secret `postgres-credentials` → `env` + `secretKeyRef` → `POSTGRES_USERNAME` / `POSTGRES_PASSWORD`.
