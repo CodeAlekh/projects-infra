@@ -15,3 +15,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: projects-service
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
