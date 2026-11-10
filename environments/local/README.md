@@ -133,10 +133,14 @@ DNS name for clients: `postgres-0.postgres.postgres.svc.cluster.local:5432`
 Note: the PVC lives on the laptop's disk (kind's local-path provisioner); the `1Gi`
 size is not enforced. `kind delete cluster` deletes the data.
 
-## 7. projects-service (manual for now, Argo CD later)
+## 7. projects-service
 
 Needs steps 4–6 first (image loaded, Secret in the `projects-service` namespace,
 Postgres running).
+
+**Argo CD deploys this app now (step 8).** On a fresh cluster, skip the `helm install` /
+`helm upgrade` commands below and apply the Application in step 8 instead. The preview,
+validate and check commands here still apply.
 
 Chart defaults are in `charts/projects-service/values.yaml`; kind overrides
 (1 replica, local image tag, `db.host`, route on `api.localhost`) are in
@@ -209,6 +213,67 @@ kubectl logs -n projects-service deploy/projects-service              # app outp
 kubectl logs -n projects-service deploy/projects-service --previous   # last crashed attempt
 kubectl describe pod -n projects-service <pod-name>                   # Events at the bottom
 ```
+
+## 8. Argo CD (GitOps controller)
+
+Community chart `argo/argo-cd` **10.17.1** (Argo CD v3.6.1). `argocd-values.yaml` only turns
+off Dex (SSO login; the built-in `admin` user is enough) and notifications (Slack/email alerts).
+The UI stays private: port-forward only, no HTTPRoute.
+
+```bash
+helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update argo
+
+helm install argocd argo/argo-cd --version 10.17.1 \
+  -n argocd --create-namespace \
+  -f environments/local/argocd-values.yaml
+
+kubectl get pods -n argocd -w   # 5 pods 1/1 Running: application-controller, applicationset-controller,
+                                # redis, repo-server, server
+```
+
+Open the UI:
+
+```bash
+# initial admin password (never commit or paste it anywhere)
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d; echo
+
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+# https://localhost:8080, user admin; accept the self-signed certificate warning
+```
+
+### projects-service Application
+
+`apps/local/argocd/projects-service.yaml` is the `helm upgrade` command as an object: repo
+`projects-infra` on `main`, path `charts/projects-service`, value file relative to the chart
+folder (`../../environments/local/projects-service-values.yaml`), destination namespace
+`projects-service`. Its `metadata.name` is the Helm release name Argo CD renders with, so it
+must stay `projects-service`. Argo CD reads GitHub, not the laptop: push first.
+
+```bash
+kubectl apply -f apps/local/argocd/projects-service.yaml
+kubectl get applications -n argocd        # SYNC STATUS / HEALTH STATUS
+```
+
+No `syncPolicy` yet = manual: Argo CD only compares; press SYNC in the UI to apply.
+
+### One-time handover from a manual Helm release (only if step 7 was installed with Helm)
+
+Done 2026-11-09. Helm-created objects have no Argo CD tracking annotation, so the app first
+shows `OutOfSync` even when every field matches (`kubectl diff` of the rendered chart was empty).
+
+1. SYNC in the UI: Argo CD adds `argocd.argoproj.io/tracking-id` to each object. Same
+   names, so it updates the existing objects (no copies, no pod restart).
+2. Make Helm forget the release without touching the objects (Helm keeps its history as
+   Secrets in the app namespace; `postgres-credentials` is not matched by this label):
+
+```bash
+kubectl delete secret -n projects-service -l owner=helm,name=projects-service
+helm list -n projects-service             # empty
+```
+
+From then on: never `helm upgrade` / `helm uninstall` this app; deploy by pushing to git.
 
 ## Delete everything
 

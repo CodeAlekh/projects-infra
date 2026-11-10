@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: projects-service
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/CodeAlekh/projects-infra.git
+    targetRevision: main
+    path: charts/projects-service
+    helm:
+      valueFiles:
+        - ../../environments/local/projects-service-values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: projects-service
